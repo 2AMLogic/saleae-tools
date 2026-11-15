@@ -36,8 +36,9 @@ Not done:
 
 - **No capture of real protocol traffic has been verified.** Every decoder
   result so far comes from exports written by `binexport.write_digital`.
-- **Bench stages 1, 2 and 5** (pin-through, loader, I2C) have probe profiles in
-  `examples/` but no offline check that can pass or fail a capture.
+- **Bench stage 1** (pin-through) has a probe profile in `examples/` but no
+  offline check that can pass or fail a capture; stages 2 and 5 got theirs
+  when `slt syncserial` (#38) and `slt i2c` (#44) landed.
 - **Build step 5** (headless server) and **build step 6** (`extensions/`, which
   holds only `.gitkeep`) have not started.
 - The package is `0.1.0` in `pyproject.toml`, with no tag and no release.
@@ -54,7 +55,8 @@ the pattern of `uart.py` and `spi.py`: a stdlib-only module, fixtures from
 failed assertion. Each was filed as an issue when this roadmap was
 written; the number is cited in the item.
 
-1. **Offline I2C decoder and `slt i2c --expect` (bench stage 5) — #27.**
+1. **Offline I2C decoder and `slt i2c --expect` (bench stage 5) — #27,
+   landed via #44 on 2026-11-15.**
    Done when `src/saleae_tools/i2c.py` decodes START, repeated START, STOP,
    address, read/write bit, data bytes and ACK/NACK from SCL and SDA exports,
    `slt i2c` asserts an expected transaction, and `tests/test_i2c.py` passes
@@ -66,8 +68,9 @@ written; the number is cited in the item.
    default) from a clock and a data export while an enable signal is at its
    active level, asserts expected words, and has synthetic tests for word
    boundaries and a partial trailing word. Blocked by: nothing.
-3. **Limits on `slt timing` so a measurement can fail a run — #29.**
-   `slt timing` always exits 0, and `bringup.md` lists timing masks as
+3. **Limits on `slt timing` so a measurement can fail a run — #29,
+   landed via #35 on 2026-11-15.**
+   `slt timing` used to always exit 0, and `bringup.md` listed timing masks as
    follow-on work. Done when the verb accepts minimum and maximum bounds for
    high pulse, low pulse and period, reports each violated bound in its JSON,
    exits 1 on a violation or on an empty distribution that a bound was set
