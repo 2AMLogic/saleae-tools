@@ -54,7 +54,63 @@ def test_pattern(tmp_path, baud):
 @pytest.mark.parametrize("scale", [0.98, 1.02])
 def test_baud_error(tmp_path, scale):
     export = _roundtrip(tmp_path, [_chunk([0x55, 0x00, 0xFF] * 3, 115200, scale=scale)])
-    assert [f.byte for f in decode(export, 115200).frames] == [0x55, 0x00, 0xFF] * 3
+    r = decode(export, 115200)
+    assert [f.byte for f in r.frames] == [0x55, 0x00, 0xFF] * 3
+    assert r.bit_time_s == pytest.approx(scale / 115200)
+    for f in r.frames:
+        if f.byte == 0xFF:
+            assert f.bit_time_s is None  # k_max = 1, too short a baseline
+        else:
+            assert f.bit_time_s == pytest.approx(scale / 115200)
+    assert r.frames_excluded == 3
+
+
+def test_measure_on_rate(tmp_path):
+    export = _roundtrip(tmp_path, [_chunk([0x55, 0x00, 0xFF] * 4, 115200)])
+    r = decode(export, 115200)
+    assert r.bit_time_s == pytest.approx(1 / 115200)
+    assert r.frames_excluded == 4  # the four 0xFF frames (k_max = 1)
+    assert [f.bit_time_s is None for f in r.frames] == [False, False, True] * 4
+
+
+def test_measure_three_percent_fast(tmp_path):
+    # scale multiplies bit time, so scale = 1/1.03 is a transmitter 3% fast.
+    export = _roundtrip(tmp_path, [_chunk([0x55, 0x00, 0xFF] * 4, 115200, scale=1 / 1.03)])
+    r = decode(export, 115200)
+    assert [f.byte for f in r.frames] == [0x55, 0x00, 0xFF] * 4
+    assert not any(f.framing_error or f.parity_error for f in r.frames)
+    error = (1 / r.bit_time_s) / 115200 - 1
+    assert error == pytest.approx(0.03, abs=1e-9)
+    # 8N1 mis-decodes at |error| where (10 - 0.5) * |error| reaches 0.5 bits.
+    assert (10 - 0.5) * abs(error) == pytest.approx(0.285, abs=1e-9)
+    assert r.frames_excluded == 4
+
+
+def test_measure_unmeasurable_ff_only():
+    r = decode(DigitalExport(1, [_chunk([0xFF] * 6, 115200)]), 115200)
+    assert [f.byte for f in r.frames] == [0xFF] * 6
+    assert all(f.bit_time_s is None for f in r.frames)
+    assert r.frames_excluded == 6 and r.bit_time_s is None
+
+
+def test_measure_zero_frames_are_kept():
+    # 0x00 offers the longest baseline (one edge at boundary 9): it must measure.
+    r = decode(DigitalExport(1, [_chunk([0x00] * 3, 115200)]), 115200)
+    assert [f.byte for f in r.frames] == [0x00] * 3
+    assert r.bit_time_s == pytest.approx(1 / 115200)
+    assert r.frames_excluded == 0
+
+
+def test_measure_wide_frame():
+    # n_bits = 1 + 8 + 1 + 2 = 12; the edge window must follow parity/stop bits.
+    r = decode(
+        DigitalExport(1, [_chunk([0x55] * 2, 115200, parity="even", stop_bits=2)]),
+        115200,
+        parity="even",
+        stop_bits=2,
+    )
+    assert r.bit_time_s == pytest.approx(1 / 115200)
+    assert r.frames_excluded == 0
 
 
 def test_framing_error():
@@ -104,6 +160,10 @@ def test_gap_mid_frame_is_truncated_not_bad_byte(tmp_path):
     result = decode(export, baud)
     assert [f.byte for f in result.frames] == [0x55, 0xFF]
     assert result.truncated == 1
+    # The chunk-cut 0x00 is truncated, never decoded, so it feeds no measurement;
+    # the surviving 0x55 measures, the 0xFF is excluded.
+    assert result.frames_excluded == 1
+    assert result.bit_time_s == pytest.approx(1 / baud)
 
 
 def test_empty_and_constant():

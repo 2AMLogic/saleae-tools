@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass, field
 
 from saleae_tools.binexport import DigitalExport
@@ -13,12 +14,15 @@ class Frame:
     byte: int
     framing_error: bool
     parity_error: bool
+    bit_time_s: float | None = None  # least-squares fit over this frame's own edges
 
 
 @dataclass
 class Decoded:
     frames: list[Frame] = field(default_factory=list)
     truncated: int = 0  # frames cut off by the end of a chunk; never decoded
+    bit_time_s: float | None = None  # pooled over frames with a long-enough baseline
+    frames_excluded: int = 0  # frames whose furthest intra-frame edge is k_max < 2
 
 
 def decode(
@@ -34,6 +38,13 @@ def decode(
 
     A frame whose last sampled bit lies past ``chunk.end_time`` is dropped and
     counted in ``truncated`` instead of being decoded from missing data.
+
+    Each frame's own intra-frame edges (boundaries ``1 .. n_bits - 1`` within
+    0.4 bit of the nominal grid) are least-squares-fit through the origin
+    for a bit time, pooled across frames into ``bit_time_s``. Frames whose
+    furthest edge sits at boundary ``k_max < 2`` — too short a baseline, e.g.
+    ``0xff`` — are excluded and counted; sampling itself stays on the nominal
+    grid, which is what makes the reported drift meaningful.
     """
     if baud <= 0:
         raise ValueError("baud must be positive")
@@ -46,6 +57,8 @@ def decode(
     n_parity = 0 if parity == "none" else 1
     n_bits = 1 + bits + n_parity + stop_bits
     out = Decoded()
+    pool_kdt = 0.0
+    pool_kk = 0.0
     for chunk in export.chunks:
         ts = chunk.transitions
         floor = float("-inf")  # ignore edges at or before the previous frame's last sample
@@ -65,6 +78,27 @@ def decode(
                 ones = bin(value).count("1") + (sample[1 + bits] ^ (1 - idle))
                 parity_error = (ones % 2 == 1) if parity == "even" else (ones % 2 == 0)
             framing_error = any(b != idle for b in sample[1 + bits + n_parity :])
-            out.frames.append(Frame(t0, value, framing_error, parity_error))
+            # Fit the bit time to this frame's own edges: k = round(dt / bit_s)
+            # on the nominal grid, kept when 1 <= k <= n_bits - 1 and within
+            # 0.4 bits of boundary k. The window stops at n_bits - 1 so an ff
+            # frame never folds in the next frame's start bit.
+            sum_kdt = 0.0
+            sum_kk = 0.0
+            k_max = 0
+            for t in ts[i + 1 : bisect_left(ts, t0 + n_bits * bit_s)]:
+                dt = t - t0
+                k = round(dt / bit_s)
+                if 1 <= k <= n_bits - 1 and abs(dt - k * bit_s) < 0.4 * bit_s:
+                    sum_kdt += k * dt
+                    sum_kk += k * k
+                    k_max = k
+            bit_time = sum_kdt / sum_kk if k_max >= 2 else None
+            out.frames.append(Frame(t0, value, framing_error, parity_error, bit_time))
+            if bit_time is None:
+                out.frames_excluded += 1
+            else:
+                pool_kdt += sum_kdt
+                pool_kk += sum_kk
             floor = last_sample
+    out.bit_time_s = pool_kdt / pool_kk if pool_kk > 0 else None
     return out

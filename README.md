@@ -34,7 +34,7 @@ this package's Ruff checks.
 | `saleae_tools.automation` | `logic2-automation` (extra) | Connect or launch, list devices, timed/edge-triggered capture, binary export. |
 | `saleae_tools.profile` / `session` | stdlib / automation extra for live runs | TOML signal maps and analyzer settings; capture/export bundles with run metadata and artifact hashes. |
 | `saleae_tools.timing` | stdlib | Complete pulse widths and like-edge periods, excluding chunk gaps and partial boundary pulses. Optional min/max bounds turn a measurement into a pass/fail check. |
-| `saleae_tools.uart` | stdlib | Offline UART frame decoder (parity, stop bits, framing errors) and repeating-pattern check; chunk-cut frames are counted as truncated. |
+| `saleae_tools.uart` | stdlib | Offline UART frame decoder (parity, stop bits, framing errors) and repeating-pattern check; measures bit time, baud error and worst per-frame drift (in bits, where 0.5 is the mis-decode threshold) from intra-frame edges, excluding frames with too short an edge baseline; chunk-cut frames are counted as truncated. |
 | `saleae_tools.spi` | stdlib | Offline SPI decoder (modes 0-3, word size, bit order) over `digital_N.bin` exports; reports MOSI/MISO words per CS transaction and counts truncated transactions and leftover bits. Synthetic-tested only; no iCEPi SPI capture has been verified. |
 | `saleae_tools.syncserial` | stdlib | Offline decoder for the program loader's custom synchronous serial interface (bring-up stage 2), which has no stock Logic 2 analyzer. A thin adapter over `saleae_tools.spi`: a required enable line gates each interval of fixed-width words, sampled on a selectable clock edge. Synthetic-tested only; no iCEPi loader capture has been verified. |
 | `saleae_tools.i2c` | stdlib | Offline I2C decoder (START / repeated START / STOP, 7-bit address, ACK/NACK per byte) over `digital_N.bin` exports; `--expect ADDR:w|r:BYTES` asserts one transaction, and a controller-NACKed final read byte is not a failure. Synthetic-tested only; no iCEPi I²C capture has been verified. |
@@ -76,6 +76,9 @@ slt timing captures/uart-001/digital_6.bin --min-high-pulse 8e-6 --max-rising-pe
 
 # Decode UART bytes and assert a repeating pattern (exit 1 on mismatch/errors)
 slt uart captures/uart-001/digital_6.bin --baud 115200 --expect 55,00,ff
+
+# Report measured baud and drift too; exit 1 when the error exceeds --baud-tolerance
+slt uart captures/uart-001/digital_6.bin --baud 115200 --baud-tolerance 0.02
 
 # Decode SPI words (D0..D3 = sclk,mosi,miso,cs_n) and assert MOSI (exit 1 on mismatch, truncation or leftover bits)
 slt spi captures/spi-001 --channels 0,1,2,3 --mode 0 --expect 9f,00,00
