@@ -307,6 +307,7 @@ stage-2 run can fail. Like `slt uart` and `slt spi` it is synthetic-tested
 only; no loader capture from hardware has been verified. Core
 readback/internal state still needs an exposed debug path or a test wrapper;
 raw pin captures alone do not establish that program memory was written
+correctly.
 
 I2C does have a stock Logic 2 analyzer, but reading its table needs the
 application and gives no exit status. `slt i2c` decodes the same exports
@@ -317,7 +318,6 @@ unexpected NACK (an address NACK or a data NACK on a write — the controller
 normally NACKs a read's final byte to end the transfer) or a transaction cut
 by a chunk end, so a stage-5 run can fail. Like `slt uart` and `slt spi` it
 is synthetic-tested only; no I²C capture from hardware has been verified.
-correctly.
 
 Automation supports timed and edge-triggered captures with a bounded trigger
 wait. Aggregate pulse-width and period bounds now ship on `slt timing` (above);
