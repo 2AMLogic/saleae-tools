@@ -15,8 +15,18 @@ from saleae_tools.binexport import (
     read_digital,
     read_export,
 )
+from saleae_tools.expect import Match, match_expected
 from saleae_tools.profile import Profile, Trigger, load_profile, parse_channels
 from saleae_tools.vcd import write_vcd
+
+
+def _print_match(label: str, m: Match, noun: str) -> None:
+    if m.matched:
+        print(f"{label}: matched from {noun} {m.start_offset}, {m.repeats} repeats")
+    elif m.start_offset is None:
+        print(f"{label}: pattern not found in decoded stream")
+    else:
+        print(f"{label}: first mismatch at {noun} offset {m.mismatch_offset}")
 
 
 def _describe(path: Path) -> dict[str, object]:
@@ -103,18 +113,6 @@ def _parse_hex_words(text: str | None, flag: str, bits: int = 8) -> list[int] | 
     if not vals or not all(0 <= v < (1 << bits) for v in vals):
         raise ValueError(f"{flag} words must be hex values that fit in --bits")
     return vals
-
-
-def _print_expect(key: str, m: object, unit: str) -> None:
-    """Render one ``match_expected`` result; ``unit`` names the stream items."""
-    if not isinstance(m, dict):
-        return
-    if m["matched"]:
-        print(f"{key}: matched from {unit} {m['start_offset']}, {m['repeats']} repeats")
-    elif m["start_offset"] is None:
-        print(f"{key}: pattern not found in decoded stream")
-    else:
-        print(f"{key}: first mismatch at {unit} offset {m['mismatch_offset']}")
 
 
 def cmd_vcd(args: argparse.Namespace) -> int:
@@ -257,7 +255,7 @@ def cmd_timing(args: argparse.Namespace) -> int:
 
 
 def cmd_uart(args: argparse.Namespace) -> int:
-    from saleae_tools.uart import decode, match_expected
+    from saleae_tools.uart import decode
 
     try:
         expected = (
@@ -287,10 +285,11 @@ def cmd_uart(args: argparse.Namespace) -> int:
         "frames": [asdict(f) for f in frames],
     }
     ok = framing == 0 and parity == 0
+    match: Match | None = None
     if expected is not None:
         match = match_expected([f.byte for f in frames], expected)
-        report["expect"] = match
-        ok = ok and bool(match["matched"])
+        report["expect"] = asdict(match)
+        ok = ok and match.matched
     if args.json:
         _emit_json(report)
     else:
@@ -298,14 +297,13 @@ def cmd_uart(args: argparse.Namespace) -> int:
             f"{len(frames)} frames, {framing} framing errors, {parity} parity errors, "
             f"{result.truncated} truncated"
         )
-        if expected is not None:
-            _print_expect("expect", report.get("expect"), "byte")
+        if match is not None:
+            _print_match("expect", match, "byte")
     return 0 if ok else 1
 
 
 def cmd_spi(args: argparse.Namespace) -> int:
     from saleae_tools.spi import decode
-    from saleae_tools.uart import match_expected
 
     try:
         paths = _resolve_channel_paths(args, 4, "four names", "four files (sclk mosi miso cs_n)")
@@ -331,25 +329,27 @@ def cmd_spi(args: argparse.Namespace) -> int:
         "transactions": [asdict(t) for t in txns],
     }
     ok = result.truncated == 0 and leftover == 0
+    matches: list[tuple[str, Match]] = []
     for key, want, stream in (
         ("expect", expected, [w for t in txns for w in t.mosi]),
         ("expect_miso", expected_miso, [w for t in txns for w in (t.miso or [])]),
     ):
         if want is not None:
-            report[key] = match = match_expected(stream, want)
-            ok = ok and bool(match["matched"])
+            m = match_expected(stream, want)
+            report[key] = asdict(m)
+            matches.append((key, m))
+            ok = ok and m.matched
     if args.json:
         _emit_json(report)
     else:
         print(f"{len(txns)} transactions, {leftover} leftover bits, {result.truncated} truncated")
-        for key in ("expect", "expect_miso"):
-            _print_expect(key, report.get(key), "word")
+        for key, m in matches:
+            _print_match(key, m, "word")
     return 0 if ok else 1
 
 
 def cmd_syncserial(args: argparse.Namespace) -> int:
     from saleae_tools.syncserial import decode
-    from saleae_tools.uart import match_expected
 
     try:
         paths = _resolve_channel_paths(
@@ -390,15 +390,18 @@ def cmd_syncserial(args: argparse.Namespace) -> int:
         ],
     }
     ok = result.truncated == 0 and leftover == 0
+    match: Match | None = None
     if expected is not None:
         stream = [w for t in intervals for w in t.mosi]
-        report["expect"] = match = match_expected(stream, expected)
-        ok = ok and bool(match["matched"])
+        match = match_expected(stream, expected)
+        report["expect"] = asdict(match)
+        ok = ok and match.matched
     if args.json:
         _emit_json(report)
     else:
         print(f"{len(intervals)} intervals, {leftover} leftover bits, {result.truncated} truncated")
-        _print_expect("expect", report.get("expect"), "word")
+        if match is not None:
+            _print_match("expect", match, "word")
     return 0 if ok else 1
 
 

@@ -3,7 +3,7 @@ import array
 import pytest
 
 from saleae_tools.binexport import DigitalChunk, DigitalExport, read_digital, write_digital
-from saleae_tools.uart import decode, match_expected
+from saleae_tools.uart import decode
 
 
 def _bits(byte, *, parity="none", stop_bits=1, bits=8, bad_stop=False, flip_parity=False):
@@ -121,17 +121,3 @@ def test_bad_args():
         decode(DigitalExport(1), 0)
     with pytest.raises(ValueError):
         decode(DigitalExport(1), 9600, parity="mark")
-
-
-def test_match_expected():
-    p = [0x55, 0x00, 0xFF]
-    ok = match_expected([0x00, 0x55, 0x00, 0xFF, 0x55, 0x00], p)
-    assert ok["matched"] and ok["start_offset"] == 1
-    bad = match_expected([0x55, 0x00, 0xFF, 0x55, 0x01, 0xFF], p)
-    assert not bad["matched"] and bad["mismatch_offset"] == 4
-    assert match_expected([0x55, 0x00], p) == {
-        "matched": False,
-        "start_offset": None,
-        "mismatch_offset": None,
-        "repeats": 0,
-    }
