@@ -30,16 +30,33 @@ def main() -> int:
         default="board",
         choices=["board", "uart", "spi", "i2c", "loader", "pin-through"],
     )
-    parser.add_argument("--trigger", default="event", help="named signal, e.g. event, cs_n, rst_n")
-    parser.add_argument("--edge", choices=["rising", "falling"], default="rising")
-    parser.add_argument("--pre", type=float, default=0.01)
-    parser.add_argument("--post", type=float, default=0.05)
-    parser.add_argument("--timeout", type=float, default=30)
+    parser.add_argument(
+        "--trigger",
+        default="event",
+        help="named signal, e.g. event, cs_n, rst_n; overrides the profile's trigger.signal "
+        "even when unset",
+    )
+    parser.add_argument(
+        "--edge", choices=["rising", "falling"], help="trigger edge (default: from the profile)"
+    )
+    parser.add_argument(
+        "--pre", type=float, help="pre-trigger history in seconds (default: from the profile)"
+    )
+    parser.add_argument(
+        "--post", type=float, help="post-trigger seconds (default: from the profile)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        help="trigger + recording deadline in seconds (default: from the profile)",
+    )
     parser.add_argument("--count", type=positive_count, default=1)
     parser.add_argument("--output-root", type=Path, default=Path("captures"))
     parser.add_argument("--note", default="", help="test case, RTL revision and bitstream hash")
     parser.add_argument("--device", help="Saleae device ID")
-    parser.add_argument("--port", type=int, default=10430)
+    parser.add_argument(
+        "--port", type=int, help="automation server port (default: the automation client default)"
+    )
     parser.add_argument(
         "--dry-run", action="store_true", help="validate without connecting or writing"
     )
@@ -56,16 +73,6 @@ def main() -> int:
             str(root / "examples" / f"icepi-{args.protocol}.toml"),
             "--trigger",
             args.trigger,
-            "--edge",
-            args.edge,
-            "--pre",
-            str(args.pre),
-            "--post",
-            str(args.post),
-            "--timeout",
-            str(args.timeout),
-            "--port",
-            str(args.port),
             "--output",
             str(output),
             "--note",
@@ -74,6 +81,15 @@ def main() -> int:
             "--vcd",
             "--json",
         ]
+        for flag, value in (
+            ("--edge", args.edge),
+            ("--pre", args.pre),
+            ("--post", args.post),
+            ("--timeout", args.timeout),
+            ("--port", args.port),
+        ):
+            if value is not None:
+                command.extend([flag, str(value)])
         if args.device:
             command.extend(["--device", args.device])
         if args.dry_run:
