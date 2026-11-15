@@ -15,8 +15,18 @@ from saleae_tools.binexport import (
     read_digital,
     read_export,
 )
+from saleae_tools.expect import Match, match_expected
 from saleae_tools.profile import Profile, Trigger, load_profile, parse_channels
 from saleae_tools.vcd import write_vcd
+
+
+def _print_match(label: str, m: Match, noun: str) -> None:
+    if m.matched:
+        print(f"{label}: matched from {noun} {m.start_offset}, {m.repeats} repeats")
+    elif m.start_offset is None:
+        print(f"{label}: pattern not found in decoded stream")
+    else:
+        print(f"{label}: first mismatch at {noun} offset {m.mismatch_offset}")
 
 
 def _describe(path: Path) -> dict[str, object]:
@@ -196,16 +206,32 @@ def cmd_capture(args: argparse.Namespace) -> int:
 
 
 def cmd_timing(args: argparse.Namespace) -> int:
-    from saleae_tools.timing import measure
+    from saleae_tools.timing import BOUNDED, check_bounds, measure, validate_bounds
 
-    rows = [{"path": p, **measure(read_digital(p))} for p in args.files]
+    bounds = {
+        f"{side}_{key}": limit
+        for key in BOUNDED
+        for side in ("min", "max")
+        if (limit := getattr(args, f"{side}_{key}")) is not None
+    }
+    try:
+        validate_bounds(bounds)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    rows: list[dict[str, object]] = [{"path": p, **measure(read_digital(p))} for p in args.files]
+    ok = True
+    if bounds:
+        for row in rows:
+            row["violations"] = violations = check_bounds(row, bounds)
+            ok = ok and not violations
     json.dump(rows, sys.stdout, indent=2)
     sys.stdout.write("\n")
-    return 0
+    return 0 if ok else 1
 
 
 def cmd_uart(args: argparse.Namespace) -> int:
-    from saleae_tools.uart import decode, match_expected
+    from saleae_tools.uart import decode
 
     try:
         expected = (
@@ -235,10 +261,11 @@ def cmd_uart(args: argparse.Namespace) -> int:
         "frames": [asdict(f) for f in frames],
     }
     ok = framing == 0 and parity == 0
+    match: Match | None = None
     if expected is not None:
         match = match_expected([f.byte for f in frames], expected)
-        report["expect"] = match
-        ok = ok and bool(match["matched"])
+        report["expect"] = asdict(match)
+        ok = ok and match.matched
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
@@ -247,21 +274,13 @@ def cmd_uart(args: argparse.Namespace) -> int:
             f"{len(frames)} frames, {framing} framing errors, {parity} parity errors, "
             f"{result.truncated} truncated"
         )
-        if expected is not None:
-            m = report["expect"]
-            assert isinstance(m, dict)
-            if m["matched"]:
-                print(f"expect: matched from byte {m['start_offset']}, {m['repeats']} repeats")
-            elif m["start_offset"] is None:
-                print("expect: pattern not found in decoded stream")
-            else:
-                print(f"expect: first mismatch at byte offset {m['mismatch_offset']}")
+        if match is not None:
+            _print_match("expect", match, "byte")
     return 0 if ok else 1
 
 
 def cmd_spi(args: argparse.Namespace) -> int:
     from saleae_tools.spi import decode
-    from saleae_tools.uart import match_expected
 
     def parse(text: str | None, flag: str) -> list[int] | None:
         if not text:
@@ -303,33 +322,28 @@ def cmd_spi(args: argparse.Namespace) -> int:
         "transactions": [asdict(t) for t in txns],
     }
     ok = result.truncated == 0 and leftover == 0
+    matches: list[tuple[str, Match]] = []
     for key, want, stream in (
         ("expect", expected, [w for t in txns for w in t.mosi]),
         ("expect_miso", expected_miso, [w for t in txns for w in (t.miso or [])]),
     ):
         if want is not None:
-            report[key] = match = match_expected(stream, want)
-            ok = ok and bool(match["matched"])
+            m = match_expected(stream, want)
+            report[key] = asdict(m)
+            matches.append((key, m))
+            ok = ok and m.matched
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
         print(f"{len(txns)} transactions, {leftover} leftover bits, {result.truncated} truncated")
-        for key in ("expect", "expect_miso"):
-            m = report.get(key)
-            if isinstance(m, dict):
-                if m["matched"]:
-                    print(f"{key}: matched from word {m['start_offset']}, {m['repeats']} repeats")
-                elif m["start_offset"] is None:
-                    print(f"{key}: pattern not found in decoded stream")
-                else:
-                    print(f"{key}: first mismatch at word offset {m['mismatch_offset']}")
+        for key, m in matches:
+            _print_match(key, m, "word")
     return 0 if ok else 1
 
 
 def cmd_syncserial(args: argparse.Namespace) -> int:
     from saleae_tools.syncserial import decode
-    from saleae_tools.uart import match_expected
 
     try:
         if args.channels:
@@ -380,23 +394,82 @@ def cmd_syncserial(args: argparse.Namespace) -> int:
         ],
     }
     ok = result.truncated == 0 and leftover == 0
+    match: Match | None = None
     if expected is not None:
         stream = [w for t in intervals for w in t.mosi]
-        report["expect"] = match = match_expected(stream, expected)
-        ok = ok and bool(match["matched"])
+        match = match_expected(stream, expected)
+        report["expect"] = asdict(match)
+        ok = ok and match.matched
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
         print(f"{len(intervals)} intervals, {leftover} leftover bits, {result.truncated} truncated")
+        if match is not None:
+            _print_match("expect", match, "word")
+    return 0 if ok else 1
+
+
+def cmd_i2c(args: argparse.Namespace) -> int:
+    from saleae_tools.i2c import decode, match_transaction, parse_expect
+
+    try:
+        if args.channels:
+            nums = args.channels.split(",")
+            if len(args.files) != 1 or len(nums) != 2:
+                raise ValueError("--channels needs one directory and two channel numbers")
+            paths = [Path(args.files[0]) / f"digital_{n.strip()}.bin" for n in nums]
+        elif len(args.files) == 2:
+            paths = [Path(f) for f in args.files]
+        else:
+            raise ValueError("give two files (scl sda) or --channels DIR")
+        expected = parse_expect(args.expect) if args.expect else None
+        scl, sda = (read_digital(path) for path in paths)
+        result = decode(scl, sda)
+    except (ValueError, OSError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    txns = result.transactions
+    # Unexpected NACK: an address NACK, or a data NACK on a write. The final
+    # byte of a read is normally NACKed by the controller to end the
+    # transfer, so read data NACKs are not failures.
+    unexpected = 0
+    for t in txns:
+        if not t.address_ack:
+            unexpected += 1
+        if not t.read:
+            unexpected += sum(1 for a in t.acks if not a)
+    report: dict[str, object] = {
+        "transaction_count": len(txns),
+        "truncated": result.truncated,
+        "unexpected_nacks": unexpected,
+        "transactions": [asdict(t) for t in txns],
+    }
+    ok = result.truncated == 0 and unexpected == 0
+    if expected is not None:
+        address, read, data = expected
+        report["expect"] = match = match_transaction(txns, address, read, data)
+        ok = ok and bool(match["matched"])
+    if args.json:
+        json.dump(report, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        print(
+            f"{len(txns)} transactions, {unexpected} unexpected NACKs, {result.truncated} truncated"
+        )
+        for t in txns:
+            payload = " ".join(f"{b:02x}" for b in t.data) or "-"
+            print(f"  {'read' if t.read else 'write'} 0x{t.address:02x}: {payload}")
         m = report.get("expect")
         if isinstance(m, dict):
             if m["matched"]:
-                print(f"expect: matched from word {m['start_offset']}, {m['repeats']} repeats")
-            elif m["start_offset"] is None:
-                print("expect: pattern not found in decoded stream")
+                print(f"expect: matched transaction {m['index']}")
+            elif m["candidate_index"] is None:
+                print("expect: no decoded transaction to match")
             else:
-                print(f"expect: first mismatch at word offset {m['mismatch_offset']}")
+                print(
+                    f"expect: no match; closest transaction {m['candidate_index']} differs in {m['mismatch_field']}"
+                )
     return 0 if ok else 1
 
 
@@ -501,6 +574,16 @@ def build_parser() -> argparse.ArgumentParser:
         "timing", help="JSON pulse/period measurements from digital exports (offline)"
     )
     s.add_argument("files", nargs="+")
+    from saleae_tools.timing import BOUNDED
+
+    for key in BOUNDED:
+        flag, label = key.replace("_", "-"), key.replace("_", " ")
+        s.add_argument(
+            f"--min-{flag}", type=float, metavar="S", help=f"shortest allowed {label}, in seconds"
+        )
+        s.add_argument(
+            f"--max-{flag}", type=float, metavar="S", help=f"longest allowed {label}, in seconds"
+        )
     s.set_defaults(fn=cmd_timing)
 
     s = sub.add_parser("uart", help="decode UART bytes from a digital export (offline)")
@@ -559,6 +642,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--expect", help="comma-separated hex words expected to repeat, e.g. a5a5,1234")
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_syncserial)
+
+    s = sub.add_parser("i2c", help="decode I2C transactions from digital exports (offline)")
+    s.add_argument("files", nargs="+", help="scl sda files, or one directory with --channels")
+    s.add_argument(
+        "--channels",
+        help="channel numbers scl,sda of digital_N.bin in the directory "
+        "(examples/icepi-i2c.toml: 4,5)",
+    )
+    s.add_argument(
+        "--expect",
+        help="expected transaction ADDR:w|r:BYTES, e.g. 3c:w:01,02,03; ADDR is hex, "
+        "BYTES a comma-separated hex list, empty BYTES asserts address and direction only",
+    )
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_i2c)
 
     s = sub.add_parser("mcp-tools", help="list tools exposed by the Logic 2 MCP server")
     s.add_argument("--url", default="http://127.0.0.1:10530")

@@ -139,6 +139,9 @@ uv run slt uart captures/uart-001/digital_6.bin --baud 115200 --expect 55,00,ff
 # Stage 4: decode SPI words from the exports and assert MOSI (and optionally --expect-miso); exit 1 on mismatch, truncation or leftover bits:
 uv run slt spi captures/spi-001 --channels 0,1,2,3 --mode 0 --expect 9f,00,00
 
+# Stage 5: decode I2C transactions and assert one (exit 1 on mismatch, unexpected NACK or truncation):
+uv run slt i2c captures/i2c-001 --channels 4,5 --expect 3c:w:01,02,03
+
 # Re-decode an existing .sal with edited analyzer settings; no device needed.
 uv run slt export captures/uart-001/capture.sal \
   --profile examples/icepi-uart.toml -o captures/uart-001-redecode --vcd --json
@@ -238,7 +241,14 @@ only intervals bounded by two observed edges. Leading/trailing partial
 levels and gaps between chunks are excluded. Rising/falling periods are
 calculated within chunks and can include idle time between transactions.
 Empty distributions have count 0 and null min/max/mean; they must not be
-interpreted as a passing timing check or a baud estimate.
+interpreted as a passing timing check or a baud estimate. That rule is
+enforced, not just advised: `--min-high-pulse`, `--max-high-pulse` and their
+low-pulse, rising-period and falling-period counterparts (all in seconds) add
+a `violations` list to each file's JSON and exit 1 when any bound is missed,
+and an empty distribution violates **either** bound because nothing was
+measured. With no bound given the output and exit status are unchanged.
+Bounds that no capture could satisfy -- not finite, negative, or a minimum
+above its own maximum -- exit 2 before any file is read.
 
 ## Profile format
 
@@ -299,8 +309,19 @@ readback/internal state still needs an exposed debug path or a test wrapper;
 raw pin captures alone do not establish that program memory was written
 correctly.
 
+I2C does have a stock Logic 2 analyzer, but reading its table needs the
+application and gives no exit status. `slt i2c` decodes the same exports
+offline instead (`examples/icepi-i2c.toml` maps `scl = 4`, `sda = 5`): it
+reports each transaction's START/repeated START/STOP framing, 7-bit address,
+direction, bytes and ACK/NACK, and exits 1 on an `--expect` mismatch, an
+unexpected NACK (an address NACK or a data NACK on a write — the controller
+normally NACKs a read's final byte to end the transfer) or a transaction cut
+by a chunk end, so a stage-5 run can fail. Like `slt uart` and `slt spi` it
+is synthetic-tested only; no I²C capture from hardware has been verified.
+
 Automation supports timed and edge-triggered captures with a bounded trigger
-wait. Remote stimulus orchestration, timing
+wait. Aggregate pulse-width and period bounds now ship on `slt timing` (above);
+remote stimulus orchestration, per-transaction timing
 masks and automated simulation alignment remain follow-on work. VCD tick
 zero is the earliest exported sample;
 align bench and simulation using a shared reset or marker signal rather than

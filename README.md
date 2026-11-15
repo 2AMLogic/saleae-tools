@@ -33,12 +33,13 @@ this package's Ruff checks.
 | `saleae_tools.vcd` | stdlib | `digital_*.bin` to one VCD for GTKWave / Surfer. Gaps between chunks render as `x`. |
 | `saleae_tools.automation` | `logic2-automation` (extra) | Connect or launch, list devices, timed/edge-triggered capture, binary export. |
 | `saleae_tools.profile` / `session` | stdlib / automation extra for live runs | TOML signal maps and analyzer settings; capture/export bundles with run metadata and artifact hashes. |
-| `saleae_tools.timing` | stdlib | Complete pulse widths and like-edge periods, excluding chunk gaps and partial boundary pulses. |
+| `saleae_tools.timing` | stdlib | Complete pulse widths and like-edge periods, excluding chunk gaps and partial boundary pulses. Optional min/max bounds turn a measurement into a pass/fail check. |
 | `saleae_tools.uart` | stdlib | Offline UART frame decoder (parity, stop bits, framing errors) and repeating-pattern check; chunk-cut frames are counted as truncated. |
 | `saleae_tools.spi` | stdlib | Offline SPI decoder (modes 0-3, word size, bit order) over `digital_N.bin` exports; reports MOSI/MISO words per CS transaction and counts truncated transactions and leftover bits. Synthetic-tested only; no iCEPi SPI capture has been verified. |
 | `saleae_tools.syncserial` | stdlib | Offline decoder for the program loader's custom synchronous serial interface (bring-up stage 2), which has no stock Logic 2 analyzer. A thin adapter over `saleae_tools.spi`: a required enable line gates each interval of fixed-width words, sampled on a selectable clock edge. Synthetic-tested only; no iCEPi loader capture has been verified. |
+| `saleae_tools.i2c` | stdlib | Offline I2C decoder (START / repeated START / STOP, 7-bit address, ACK/NACK per byte) over `digital_N.bin` exports; `--expect ADDR:w|r:BYTES` asserts one transaction, and a controller-NACKed final read byte is not a failure. Synthetic-tested only; no iCEPi I²C capture has been verified. |
 | `saleae_tools.mcp` | stdlib | Enumerates the tools on Logic 2's built-in MCP server, since Saleae does not publish the list. |
-| `slt` CLI | | `info`, `dump`, `vcd`, `timing`, `uart`, `spi`, `syncserial`, `devices`, `capture`, `export`, `mcp-tools`. |
+| `slt` CLI | | `info`, `dump`, `vcd`, `timing`, `uart`, `spi`, `syncserial`, `i2c`, `devices`, `capture`, `export`, `mcp-tools`. |
 | [`docs/survey.md`](docs/survey.md) | | The open source landscape as of 2026-09-21, with the reasoning behind the choices above. |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | | Where the work stands, what comes next and what waits on the bench. |
 
@@ -71,6 +72,9 @@ slt capture --profile examples/icepi-uart.toml -o captures/uart-001 --vcd --save
 # Offline timing measurements (JSON, seconds)
 slt timing captures/uart-001/digital_6.bin
 
+# Bound a measurement so it can fail a run (exit 1 on a violation, including an empty distribution)
+slt timing captures/uart-001/digital_6.bin --min-high-pulse 8e-6 --max-rising-period 9e-6
+
 # Decode UART bytes and assert a repeating pattern (exit 1 on mismatch/errors)
 slt uart captures/uart-001/digital_6.bin --baud 115200 --expect 55,00,ff
 
@@ -79,6 +83,9 @@ slt spi captures/spi-001 --channels 0,1,2,3 --mode 0 --expect 9f,00,00
 
 # Decode the program loader's clocked serial (clk,data,mode from examples/icepi-loader.toml); not SPI, so no stock analyzer exists
 slt syncserial captures/loader-001 --channels 12,11,10 --expect a5a5,1234
+
+# Decode I2C transactions (scl,sda from examples/icepi-i2c.toml) and assert one (exit 1 on mismatch, unexpected NACK or truncation)
+slt i2c captures/i2c-001 --channels 4,5 --expect 3c:w:01,02,03
 
 # Trigger on board-1's event marker, saving all 16 channels and decoded buses
 uv run python scripts/capture-board.py --note 'test=bringup; RTL=<commit>'
