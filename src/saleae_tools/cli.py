@@ -416,6 +416,69 @@ def cmd_syncserial(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_i2c(args: argparse.Namespace) -> int:
+    from saleae_tools.i2c import decode, match_transaction, parse_expect
+
+    try:
+        if args.channels:
+            nums = args.channels.split(",")
+            if len(args.files) != 1 or len(nums) != 2:
+                raise ValueError("--channels needs one directory and two channel numbers")
+            paths = [Path(args.files[0]) / f"digital_{n.strip()}.bin" for n in nums]
+        elif len(args.files) == 2:
+            paths = [Path(f) for f in args.files]
+        else:
+            raise ValueError("give two files (scl sda) or --channels DIR")
+        expected = parse_expect(args.expect) if args.expect else None
+        scl, sda = (read_digital(path) for path in paths)
+        result = decode(scl, sda)
+    except (ValueError, OSError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    txns = result.transactions
+    # Unexpected NACK: an address NACK, or a data NACK on a write. The final
+    # byte of a read is normally NACKed by the controller to end the
+    # transfer, so read data NACKs are not failures.
+    unexpected = 0
+    for t in txns:
+        if not t.address_ack:
+            unexpected += 1
+        if not t.read:
+            unexpected += sum(1 for a in t.acks if not a)
+    report: dict[str, object] = {
+        "transaction_count": len(txns),
+        "truncated": result.truncated,
+        "unexpected_nacks": unexpected,
+        "transactions": [asdict(t) for t in txns],
+    }
+    ok = result.truncated == 0 and unexpected == 0
+    if expected is not None:
+        address, read, data = expected
+        report["expect"] = match = match_transaction(txns, address, read, data)
+        ok = ok and bool(match["matched"])
+    if args.json:
+        json.dump(report, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        print(
+            f"{len(txns)} transactions, {unexpected} unexpected NACKs, {result.truncated} truncated"
+        )
+        for t in txns:
+            payload = " ".join(f"{b:02x}" for b in t.data) or "-"
+            print(f"  {'read' if t.read else 'write'} 0x{t.address:02x}: {payload}")
+        m = report.get("expect")
+        if isinstance(m, dict):
+            if m["matched"]:
+                print(f"expect: matched transaction {m['index']}")
+            elif m["candidate_index"] is None:
+                print("expect: no decoded transaction to match")
+            else:
+                print(
+                    f"expect: no match; closest transaction {m['candidate_index']} differs in {m['mismatch_field']}"
+                )
+    return 0 if ok else 1
+
+
 def cmd_mcp_tools(args: argparse.Namespace) -> int:
     from saleae_tools.mcp import McpError, list_tools
 
@@ -585,6 +648,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--expect", help="comma-separated hex words expected to repeat, e.g. a5a5,1234")
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_syncserial)
+
+    s = sub.add_parser("i2c", help="decode I2C transactions from digital exports (offline)")
+    s.add_argument("files", nargs="+", help="scl sda files, or one directory with --channels")
+    s.add_argument(
+        "--channels",
+        help="channel numbers scl,sda of digital_N.bin in the directory "
+        "(examples/icepi-i2c.toml: 4,5)",
+    )
+    s.add_argument(
+        "--expect",
+        help="expected transaction ADDR:w|r:BYTES, e.g. 3c:w:01,02,03; ADDR is hex, "
+        "BYTES a comma-separated hex list, empty BYTES asserts address and direction only",
+    )
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_i2c)
 
     s = sub.add_parser("mcp-tools", help="list tools exposed by the Logic 2 MCP server")
     s.add_argument("--url", default="http://127.0.0.1:10530")
