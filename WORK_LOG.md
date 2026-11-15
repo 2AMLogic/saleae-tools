@@ -4,6 +4,19 @@ Chronological record of merged PRs and closed issues. Maintained by the Guide ro
 
 ### 2026-11-15
 
+- **PR #47**: feat(uart): report measured baud and drift, with --baud-tolerance
+- **PR #44**: feat: add slt i2c, an offline decoder for I2C transactions
+- **PR #43**: docs: make AGENTS.md and CLAUDE.md note regions byte-identical
+- **PR #41**: fix: defer unset capture-board wrapper flags to the profile
+- **PR #40**: refactor: give the shared --expect matcher a typed home in expect.py
+- **PR #36**: refactor: replace the duplicated _level helper with DigitalChunk.level_at
+- **PR #26**: docs: roadmap as of 2026-11-13
+- **Issue #39** (closed): Remove the duplicated capture defaults in scripts/capture-board.py: a third copy that silently overrides the profile's [trigger] table
+- **Issue #37** (closed): Stop maintaining two wordings of the project notes: AGENTS.md and CLAUDE.md already drifted once
+- **Issue #33** (closed): Give the shared --expect matcher a home: move match_expected out of uart.py and type its result
+- **Issue #32** (closed): Remove the duplicated `_level` helper: hoist it onto `DigitalChunk` before a third copy lands
+- **Issue #30** (closed): Report measured bit time and sampling drift in `slt uart`, with an optional tolerance
+- **Issue #27** (closed): Add an offline I2C decoder and `slt i2c --expect` over digital exports (bring-up stage 5)
 - **PR #35**: feat: bound pulse widths and periods in slt timing so it can fail a run
 - **Issue #29** (closed): Let `slt timing` fail a run: min/max bounds on pulse widths and periods
 
