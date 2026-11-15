@@ -42,34 +42,37 @@ Not done:
   holds only `.gitkeep`) have not started.
 - The package is `0.1.0` in `pyproject.toml`, with no tag and no release.
 
-The tracker has no open work item: the one open issue (#21) is an
-automatically maintained digest, and there are no open pull requests.
+The tracker carries open work: the four Now items below were filed as
+issues #27, #28, #29 and #30 as this roadmap was written, and further
+follow-up issues and pull requests have accumulated since.
 
 ## Now
 
-Each can start today, fits one pull request, needs no hardware and follows
+Each fits one pull request, needs no hardware and follows
 the pattern of `uart.py` and `spi.py`: a stdlib-only module, fixtures from
 `binexport.write_digital`, a `slt` verb that prints JSON and exits 1 on a
-failed assertion. None has an issue yet.
+failed assertion. Each was filed as an issue when this roadmap was
+written; the number is cited in the item.
 
-1. **Offline I2C decoder and `slt i2c --expect` (bench stage 5).**
+1. **Offline I2C decoder and `slt i2c --expect` (bench stage 5) — #27.**
    Done when `src/saleae_tools/i2c.py` decodes START, repeated START, STOP,
    address, read/write bit, data bytes and ACK/NACK from SCL and SDA exports,
    `slt i2c` asserts an expected transaction, and `tests/test_i2c.py` passes
    in CI. Blocked by: nothing.
-2. **Offline clocked-serial decoder for the loader (bench stage 2).**
+2. **Offline clocked-serial decoder for the loader (bench stage 2) — #28,
+   landed via #38 on 2026-11-14.**
    The loader is "custom synchronous serial", so no stock analyzer covers it.
    Done when a `slt` verb decodes fixed-width words (16-bit, MSB-first by
    default) from a clock and a data export while an enable signal is at its
    active level, asserts expected words, and has synthetic tests for word
    boundaries and a partial trailing word. Blocked by: nothing.
-3. **Limits on `slt timing` so a measurement can fail a run.**
+3. **Limits on `slt timing` so a measurement can fail a run — #29.**
    `slt timing` always exits 0, and `bringup.md` lists timing masks as
    follow-on work. Done when the verb accepts minimum and maximum bounds for
    high pulse, low pulse and period, reports each violated bound in its JSON,
    exits 1 on a violation or on an empty distribution that a bound was set
    for, and has tests for both. Blocked by: nothing.
-4. **Measured bit time and drift in `slt uart` (bench stage 3).**
+4. **Measured bit time and drift in `slt uart` (bench stage 3) — #30.**
    Stage 3 asks for "bit-width and frame drift against the reference test";
    the decoder samples at the nominal baud and reports neither. Done when the
    report carries the measured bit time, its error against `--baud`, and the
@@ -121,7 +124,8 @@ failed assertion. None has an issue yet.
   (`survey.md`, "Native headless server"); it cannot be done from a
   hardware-free worker.
 
-The four Now items are dispatchable today; the rest is sequenced or waiting.
+The Now items not yet landed are dispatchable today; the rest is sequenced
+or waiting.
 
 ## Not planned
 
