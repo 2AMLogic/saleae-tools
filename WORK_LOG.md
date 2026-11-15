@@ -2,6 +2,16 @@
 
 Chronological record of merged PRs and closed issues. Maintained by the Guide role.
 
+### 2026-11-15
+
+- **PR #35**: feat: bound pulse widths and periods in slt timing so it can fail a run
+- **Issue #29** (closed): Let `slt timing` fail a run: min/max bounds on pulse widths and periods
+
+### 2026-11-14
+
+- **PR #38**: feat: add slt syncserial, an offline decoder for the loader's clocked serial
+- **Issue #28** (closed): Add an offline clocked-serial decoder and `slt` verb for the program loader (bring-up stage 2)
+
 ### 2026-11-13
 
 - **PR #24**: docs: correct AGENTS.md MCP bullet to .mcp.json.bench
