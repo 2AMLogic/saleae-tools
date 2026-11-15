@@ -44,7 +44,7 @@ def decode(
     counted in ``truncated`` instead of being decoded from missing data.
 
     Each frame's own intra-frame edges (boundaries ``1 .. n_bits - 1`` within
-    half a bit of the nominal grid) are least-squares-fit through the origin
+    0.4 bit of the nominal grid) are least-squares-fit through the origin
     for a bit time, pooled across frames into ``bit_time_s``. Frames whose
     furthest edge sits at boundary ``k_max < 2`` — too short a baseline, e.g.
     ``0xff`` — are excluded and counted; sampling itself stays on the nominal
