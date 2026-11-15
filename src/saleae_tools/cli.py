@@ -61,8 +61,7 @@ def _describe(path: Path) -> dict[str, object]:
 def cmd_info(args: argparse.Namespace) -> int:
     rows = [_describe(Path(p)) for p in args.files]
     if args.json:
-        json.dump(rows, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(rows)
         return 0
     for r in rows:
         if r["kind"] == "digital":
@@ -86,6 +85,35 @@ def _channel_index(path: Path) -> int:
     if "_" in stem and stem.rsplit("_", 1)[1].isdigit():
         return int(stem.rsplit("_", 1)[1])
     return 1 << 30
+
+
+def _emit_json(payload: object) -> None:
+    json.dump(payload, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+
+
+def _resolve_channel_paths(
+    args: argparse.Namespace, count: int, channels_desc: str, files_desc: str
+) -> list[Path]:
+    """Per-channel paths from --channels plus one directory, or exactly ``count`` files."""
+    if args.channels:
+        names = args.channels.split(",")
+        if len(args.files) != 1 or len(names) != count:
+            raise ValueError(f"--channels needs one directory and {channels_desc}")
+        return [Path(args.files[0]) / f"digital_{n.strip()}.bin" for n in names]
+    if len(args.files) == count:
+        return [Path(f) for f in args.files]
+    raise ValueError(f"give {files_desc} or --channels DIR")
+
+
+def _parse_hex_words(text: str | None, flag: str, bits: int = 8) -> list[int] | None:
+    """Comma-separated hex words -> ints; None when the flag is unset."""
+    if not text:
+        return None
+    vals = [int(x, 16) for x in text.split(",") if x.strip()]
+    if not vals or not all(0 <= v < (1 << bits) for v in vals):
+        raise ValueError(f"{flag} words must be hex values that fit in --bits")
+    return vals
 
 
 def cmd_vcd(args: argparse.Namespace) -> int:
@@ -119,8 +147,7 @@ def cmd_devices(args: argparse.Namespace) -> int:
     with automation.connect(port=args.port) as m:
         devs = automation.list_devices(m, include_simulation=args.simulation)
     if args.json:
-        json.dump([d.__dict__ for d in devs], sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json([d.__dict__ for d in devs])
     else:
         for d in devs:
             tag = " (simulation)" if d.is_simulation else ""
@@ -174,8 +201,7 @@ def cmd_capture(args: argparse.Namespace) -> int:
 
     profile = _capture_profile(args)
     if args.dry_run:
-        json.dump(asdict(profile), sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(asdict(profile))
         return 0
     if not args.output:
         raise ValueError("--output is required unless --dry-run is used")
@@ -196,8 +222,7 @@ def cmd_capture(args: argparse.Namespace) -> int:
         ),
     )
     if args.json:
-        json.dump(result, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(result)
     else:
         print(
             f"exported to {result['output']} (run.json records settings and artifacts)",
@@ -226,8 +251,7 @@ def cmd_timing(args: argparse.Namespace) -> int:
         for row in rows:
             row["violations"] = violations = check_bounds(row, bounds)
             ok = ok and not violations
-    json.dump(rows, sys.stdout, indent=2)
-    sys.stdout.write("\n")
+    _emit_json(rows)
     return 0 if ok else 1
 
 
@@ -285,8 +309,7 @@ def cmd_uart(args: argparse.Namespace) -> int:
         report["expect"] = asdict(match)
         ok = ok and match.matched
     if args.json:
-        json.dump(report, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(report)
     else:
         if measured_baud is None or baud_error is None or worst_drift is None:
             meas = "baud not measurable"
@@ -306,26 +329,10 @@ def cmd_uart(args: argparse.Namespace) -> int:
 def cmd_spi(args: argparse.Namespace) -> int:
     from saleae_tools.spi import decode
 
-    def parse(text: str | None, flag: str) -> list[int] | None:
-        if not text:
-            return None
-        vals = [int(x, 16) for x in text.split(",") if x.strip()]
-        if not vals or not all(0 <= v < (1 << args.bits) for v in vals):
-            raise ValueError(f"{flag} words must be hex values that fit in --bits")
-        return vals
-
     try:
-        if args.channels:
-            names = args.channels.split(",")
-            if len(args.files) != 1 or len(names) != 4:
-                raise ValueError("--channels needs one directory and four names")
-            paths = [Path(args.files[0]) / f"digital_{n.strip()}.bin" for n in names]
-        elif len(args.files) == 4:
-            paths = [Path(f) for f in args.files]
-        else:
-            raise ValueError("give four files (sclk mosi miso cs_n) or --channels DIR")
-        expected = parse(args.expect, "--expect")
-        expected_miso = parse(args.expect_miso, "--expect-miso")
+        paths = _resolve_channel_paths(args, 4, "four names", "four files (sclk mosi miso cs_n)")
+        expected = _parse_hex_words(args.expect, "--expect", bits=args.bits)
+        expected_miso = _parse_hex_words(args.expect_miso, "--expect-miso", bits=args.bits)
         sclk, mosi, cs_n = (read_digital(paths[i]) for i in (0, 1, 3))
         miso = None if args.channels and not paths[2].exists() else read_digital(paths[2])
         if expected_miso is not None and miso is None:
@@ -357,8 +364,7 @@ def cmd_spi(args: argparse.Namespace) -> int:
             matches.append((key, m))
             ok = ok and m.matched
     if args.json:
-        json.dump(report, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(report)
     else:
         print(f"{len(txns)} transactions, {leftover} leftover bits, {result.truncated} truncated")
         for key, m in matches:
@@ -370,20 +376,10 @@ def cmd_syncserial(args: argparse.Namespace) -> int:
     from saleae_tools.syncserial import decode
 
     try:
-        if args.channels:
-            nums = args.channels.split(",")
-            if len(args.files) != 1 or len(nums) != 3:
-                raise ValueError("--channels needs one directory and three channel numbers")
-            paths = [Path(args.files[0]) / f"digital_{n.strip()}.bin" for n in nums]
-        elif len(args.files) == 3:
-            paths = [Path(f) for f in args.files]
-        else:
-            raise ValueError("give three files (clk data enable) or --channels DIR")
-        expected = None
-        if args.expect:
-            expected = [int(x, 16) for x in args.expect.split(",") if x.strip()]
-            if not expected or not all(0 <= v < (1 << args.bits) for v in expected):
-                raise ValueError("--expect words must be hex values that fit in --bits")
+        paths = _resolve_channel_paths(
+            args, 3, "three channel numbers", "three files (clk data enable)"
+        )
+        expected = _parse_hex_words(args.expect, "--expect", bits=args.bits)
         clk, data, enable = (read_digital(path) for path in paths)
         result = decode(
             clk,
@@ -425,8 +421,7 @@ def cmd_syncserial(args: argparse.Namespace) -> int:
         report["expect"] = asdict(match)
         ok = ok and match.matched
     if args.json:
-        json.dump(report, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(report)
     else:
         print(f"{len(intervals)} intervals, {leftover} leftover bits, {result.truncated} truncated")
         if match is not None:
@@ -438,15 +433,7 @@ def cmd_i2c(args: argparse.Namespace) -> int:
     from saleae_tools.i2c import decode, match_transaction, parse_expect
 
     try:
-        if args.channels:
-            nums = args.channels.split(",")
-            if len(args.files) != 1 or len(nums) != 2:
-                raise ValueError("--channels needs one directory and two channel numbers")
-            paths = [Path(args.files[0]) / f"digital_{n.strip()}.bin" for n in nums]
-        elif len(args.files) == 2:
-            paths = [Path(f) for f in args.files]
-        else:
-            raise ValueError("give two files (scl sda) or --channels DIR")
+        paths = _resolve_channel_paths(args, 2, "two channel numbers", "two files (scl sda)")
         expected = parse_expect(args.expect) if args.expect else None
         scl, sda = (read_digital(path) for path in paths)
         result = decode(scl, sda)
@@ -475,8 +462,7 @@ def cmd_i2c(args: argparse.Namespace) -> int:
         report["expect"] = match = match_transaction(txns, address, read, data)
         ok = ok and bool(match["matched"])
     if args.json:
-        json.dump(report, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(report)
     else:
         print(
             f"{len(txns)} transactions, {unexpected} unexpected NACKs, {result.truncated} truncated"
@@ -506,8 +492,7 @@ def cmd_mcp_tools(args: argparse.Namespace) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
     if args.json:
-        json.dump(tools, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        _emit_json(tools)
         return 0
     for t in tools:
         desc = (t.get("description") or "").strip().splitlines()
