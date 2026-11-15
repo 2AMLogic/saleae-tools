@@ -21,9 +21,13 @@
   the automation API (`load_capture` then export) rather than unzipping.
 - `.mcp.json.bench` holds Logic 2's MCP server (`logic2`, `http://127.0.0.1:10530`).
   It is not named `.mcp.json` so fleet workers, which have no Logic 2, don't
-  load it. On the bench, start Claude with `--mcp-config .mcp.json.bench`.
+  load it. On the bench, Claude Code loads it with `--mcp-config .mcp.json.bench`;
+  other runtimes must register that server in their own MCP config.
   The `claude` shell wrapper on this machine fails in non-interactive
   shells (`_claude_build_argv: command not found`), so edit the JSON directly.
+- The notes above are identical in `AGENTS.md` and `CLAUDE.md`; edit both files
+  together and prove it with
+  `diff <(sed -n '1,30p' AGENTS.md) <(sed -n '1,30p' CLAUDE.md)` — empty = in sync.
 
 <!-- BEGIN REPO-SKILLS -->
 This repository has [Repo Skills](https://github.com/rjwalters/repo) v0.26.1 installed —
