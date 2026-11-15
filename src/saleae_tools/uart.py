@@ -73,31 +73,3 @@ def decode(
             out.frames.append(Frame(t0, value, framing_error, parity_error))
             floor = last_sample
     return out
-
-
-def match_expected(stream: list[int], pattern: list[int]) -> dict[str, object]:
-    """Check that ``pattern`` repeats through ``stream`` from its first occurrence.
-
-    A trailing partial repetition is accepted. ``mismatch_offset`` is an index
-    into ``stream``; it is None when the pattern matched or was never found.
-    """
-    n = len(pattern)
-    if n == 0:
-        raise ValueError("expected pattern is empty")
-    start = next((i for i in range(len(stream) - n + 1) if stream[i : i + n] == pattern), None)
-    if start is None:
-        return {"matched": False, "start_offset": None, "mismatch_offset": None, "repeats": 0}
-    for i in range(start, len(stream)):
-        if stream[i] != pattern[(i - start) % n]:
-            return {
-                "matched": False,
-                "start_offset": start,
-                "mismatch_offset": i,
-                "repeats": (i - start) // n,
-            }
-    return {
-        "matched": True,
-        "start_offset": start,
-        "mismatch_offset": None,
-        "repeats": (len(stream) - start) // n,
-    }
