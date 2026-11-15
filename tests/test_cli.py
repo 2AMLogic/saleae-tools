@@ -271,3 +271,40 @@ def test_uart_bad_expect_and_no_expect(tmp_path, capsys):
     f = _uart_file(tmp_path, [0x41])
     assert main(["uart", f, "--baud", "115200"]) == 0
     assert main(["uart", f, "--baud", "115200", "--expect", "zz"]) == 2
+
+
+def _i2c_dir(tmp_path, bus_ops):
+    from test_i2c import CHANNELS, _Bus
+
+    bus = _Bus()
+    for op in bus_ops:
+        name, *rest = op
+        getattr(bus, name)(*rest)
+    d = tmp_path / "i2c"
+    d.mkdir()
+    for num, export in zip(CHANNELS, bus.exports(), strict=True):
+        be.write_digital(d / f"digital_{num}.bin", export)
+    return d, bus
+
+
+def test_i2c_channels_files_json_and_expect(tmp_path, capsys):
+    d, _ = _i2c_dir(
+        tmp_path, [("start",), ("byte", 0x3C << 1, True), ("byte", 0x01, True), ("stop",)]
+    )
+    base = ["i2c", str(d), "--channels", "4,5"]
+    assert main([*base, "--expect", "3c:w:01", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["transaction_count"] == 1 and out["expect"]["matched"] is True
+    files = [str(d / f"digital_{n}.bin") for n in (4, 5)]
+    assert main(["i2c", *files, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["transaction_count"] == 1
+
+
+def test_i2c_expect_mismatch_bad_argument_and_file_count(tmp_path):
+    d, _ = _i2c_dir(
+        tmp_path, [("start",), ("byte", 0x3C << 1, True), ("byte", 0x01, True), ("stop",)]
+    )
+    base = ["i2c", str(d), "--channels", "4,5"]
+    assert main([*base, "--expect", "3c:w:02"]) == 1
+    assert main([*base, "--expect", "3c:x:01"]) == 2
+    assert main(["i2c", str(d / "digital_4.bin")]) == 2
