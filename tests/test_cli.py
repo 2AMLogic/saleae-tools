@@ -315,6 +315,97 @@ def test_uart_expect_pass_and_fail(tmp_path, capsys):
     assert "offset 4" in capsys.readouterr().out
 
 
+def test_uart_baud_measure_and_tolerance(tmp_path, capsys):
+    from test_uart import _chunk
+
+    on = _uart_file(tmp_path, [0x55, 0x00, 0xFF] * 4)
+    assert main(["uart", on, "--baud", "115200", "--json"]) == 0
+    rep = json.loads(capsys.readouterr().out)
+    assert rep["measured_bit_time_s"] == pytest.approx(1 / 115200)
+    assert rep["measured_baud"] == pytest.approx(115200)
+    assert rep["baud_error"] == pytest.approx(0, abs=1e-9)
+    assert rep["worst_drift_bits"] == pytest.approx(0, abs=1e-9)
+    assert rep["frames_excluded"] == 4
+
+    fast_path = tmp_path / "digital_fast.bin"
+    be.write_digital(
+        fast_path,
+        be.DigitalExport(1, [_chunk([0x55, 0x00, 0xFF] * 4, 115200, scale=1 / 1.03)]),
+    )
+    fast = str(fast_path)
+    assert main(["uart", fast, "--baud", "115200", "--json"]) == 0
+    rep = json.loads(capsys.readouterr().out)
+    assert rep["measured_baud"] == pytest.approx(115200 * 1.03, rel=1e-6)
+    assert rep["baud_error"] == pytest.approx(0.03, abs=1e-6)
+    assert rep["worst_drift_bits"] == pytest.approx(0.285, abs=1e-6)
+    assert main(["uart", fast, "--baud", "115200", "--baud-tolerance", "0.02"]) == 1
+    assert main(["uart", fast, "--baud", "115200", "--baud-tolerance", "0.05"]) == 0
+    assert main(["uart", fast, "--baud", "115200"]) == 0
+    out = capsys.readouterr().out
+    assert "+3.00%" in out and "0.285 bits" in out and "4 frames excluded" in out
+
+    for bad in ("0", "-0.01", "nan"):
+        assert main(["uart", fast, "--baud", "115200", "--baud-tolerance", bad]) == 2
+        assert "baud-tolerance" in capsys.readouterr().err
+
+
+def test_uart_baud_unmeasurable_and_exit_status(tmp_path, capsys):
+    from test_uart import _chunk
+
+    ff_path = tmp_path / "digital_ff.bin"
+    be.write_digital(ff_path, be.DigitalExport(1, [_chunk([0xFF] * 6, 115200)]))
+    ff = str(ff_path)
+    assert main(["uart", ff, "--baud", "115200", "--json"]) == 0
+    rep = json.loads(capsys.readouterr().out)
+    assert rep["measured_baud"] is None and rep["worst_drift_bits"] is None
+    assert rep["frames_excluded"] == 6
+    assert main(["uart", ff, "--baud", "115200", "--baud-tolerance", "0.02"]) == 1
+    capsys.readouterr()  # clear the text summary that run printed
+
+    # A single frame still reports; exit status without the option is unchanged.
+    single = _uart_file(tmp_path, [0x55])
+    assert main(["uart", single, "--baud", "115200", "--json"]) == 0
+    rep = json.loads(capsys.readouterr().out)
+    assert rep["frames_excluded"] == 0
+    assert rep["worst_drift_bits"] == pytest.approx(0, abs=1e-9)
+
+    framing_path = tmp_path / "digital_fe.bin"
+    be.write_digital(framing_path, be.DigitalExport(1, [_chunk([0x41], 115200, bad_stop=True)]))
+    assert main(["uart", str(framing_path), "--baud", "115200"]) == 1
+    assert main(["uart", single, "--baud", "115200", "--expect", "aa"]) == 1
+
+
+def test_uart_baud_drift_wide_frame(tmp_path, capsys):
+    from test_uart import _chunk
+
+    p = tmp_path / "digital_wide.bin"
+    be.write_digital(
+        p,
+        be.DigitalExport(
+            1, [_chunk([0x55] * 4, 115200, parity="even", stop_bits=2, scale=1 / 1.03)]
+        ),
+    )
+    assert (
+        main(
+            [
+                "uart",
+                str(p),
+                "--baud",
+                "115200",
+                "--parity",
+                "even",
+                "--stop-bits",
+                "2",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    rep = json.loads(capsys.readouterr().out)
+    # n_bits = 12, so the drift identity scales to (12 - 0.5) * 0.03.
+    assert rep["worst_drift_bits"] == pytest.approx(11.5 * 0.03, abs=1e-6)
+
+
 def test_uart_bad_expect_and_no_expect(tmp_path, capsys):
     f = _uart_file(tmp_path, [0x41])
     assert main(["uart", f, "--baud", "115200"]) == 0

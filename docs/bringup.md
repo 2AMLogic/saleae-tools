@@ -136,6 +136,9 @@ uv run slt syncserial captures/loader-001 --channels 12,11,10 --expect a5a5,1234
 # Stage 3: decode bytes and assert the repeating pattern (exit 1 on mismatch or frame errors):
 uv run slt uart captures/uart-001/digital_6.bin --baud 115200 --expect 55,00,ff
 
+# Stage 3, continued: read the measured baud and drift back, failing past a tolerance:
+uv run slt uart captures/uart-001/digital_6.bin --baud 115200 --baud-tolerance 0.02
+
 # Stage 4: decode SPI words from the exports and assert MOSI (and optionally --expect-miso); exit 1 on mismatch, truncation or leftover bits:
 uv run slt spi captures/spi-001 --channels 0,1,2,3 --mode 0 --expect 9f,00,00
 
@@ -241,7 +244,9 @@ only intervals bounded by two observed edges. Leading/trailing partial
 levels and gaps between chunks are excluded. Rising/falling periods are
 calculated within chunks and can include idle time between transactions.
 Empty distributions have count 0 and null min/max/mean; they must not be
-interpreted as a passing timing check or a baud estimate. That rule is
+interpreted as a passing timing check or a baud estimate — `slt uart --baud`
+is the verb that measures baud, from the edges inside decoded frames, and
+`--baud-tolerance` turns that drift figure into a failing check. That rule is
 enforced, not just advised: `--min-high-pulse`, `--max-high-pulse` and their
 low-pulse, rising-period and falling-period counterparts (all in seconds) add
 a `violations` list to each file's JSON and exit 1 when any bound is missed,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -231,6 +232,10 @@ def cmd_uart(args: argparse.Namespace) -> int:
             raise ValueError("--expect bytes must be 00..ff")
         if expected == []:
             raise ValueError("--expect is empty")
+        if args.baud_tolerance is not None and not (
+            math.isfinite(args.baud_tolerance) and args.baud_tolerance > 0
+        ):
+            raise ValueError("--baud-tolerance must be a positive finite relative error")
         result = decode(
             read_digital(args.file), args.baud, parity=args.parity, stop_bits=args.stop_bits
         )
@@ -240,9 +245,20 @@ def cmd_uart(args: argparse.Namespace) -> int:
     frames = result.frames
     framing = sum(f.framing_error for f in frames)
     parity = sum(f.parity_error for f in frames)
+    n_bits = 1 + 8 + (1 if args.parity != "none" else 0) + args.stop_bits
+    measured_baud = None if result.bit_time_s is None else 1.0 / result.bit_time_s
+    baud_error = None if measured_baud is None else measured_baud / args.baud - 1.0
+    # A fraction of a measured bit period; 0.5 is where the last sampled bit
+    # leaves its real bit and decoding starts to fail.
+    worst_drift = None if baud_error is None else (n_bits - 0.5) * abs(baud_error)
     report: dict[str, object] = {
         "path": args.file,
         "baud": args.baud,
+        "measured_bit_time_s": result.bit_time_s,
+        "measured_baud": measured_baud,
+        "baud_error": baud_error,
+        "worst_drift_bits": worst_drift,
+        "frames_excluded": result.frames_excluded,
         "frame_count": len(frames),
         "framing_errors": framing,
         "parity_errors": parity,
@@ -251,6 +267,8 @@ def cmd_uart(args: argparse.Namespace) -> int:
         "frames": [asdict(f) for f in frames],
     }
     ok = framing == 0 and parity == 0
+    if args.baud_tolerance is not None:
+        ok = ok and baud_error is not None and abs(baud_error) <= args.baud_tolerance
     if expected is not None:
         match = match_expected([f.byte for f in frames], expected)
         report["expect"] = match
@@ -259,9 +277,15 @@ def cmd_uart(args: argparse.Namespace) -> int:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
+        if measured_baud is None or baud_error is None or worst_drift is None:
+            meas = "baud not measurable"
+        else:
+            meas = (
+                f"baud {measured_baud:.0f} ({baud_error:+.2%}), worst drift {worst_drift:.3f} bits"
+            )
         print(
             f"{len(frames)} frames, {framing} framing errors, {parity} parity errors, "
-            f"{result.truncated} truncated"
+            f"{result.truncated} truncated, {meas}, {result.frames_excluded} frames excluded"
         )
         if expected is not None:
             m = report["expect"]
@@ -598,6 +622,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--parity", choices=["none", "even", "odd"], default="none")
     s.add_argument("--stop-bits", type=int, choices=[1, 2], default=1)
     s.add_argument("--expect", help="comma-separated hex bytes expected to repeat, e.g. 55,00,ff")
+    s.add_argument(
+        "--baud-tolerance",
+        type=float,
+        metavar="ERR",
+        help="exit 1 when |measured baud error| exceeds this relative tolerance (e.g. 0.02)",
+    )
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_uart)
 
