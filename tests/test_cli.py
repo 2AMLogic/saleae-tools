@@ -1,4 +1,5 @@
 import array
+import importlib.util
 import json
 import subprocess
 import sys
@@ -246,6 +247,53 @@ def test_board_helper_dry_run_does_not_create_results(tmp_path):
     assert profile["signals"]["cs_n"] == 3
     assert profile["trigger"]["edge"] == "falling"
     assert not (tmp_path / "results").exists()
+
+
+def test_board_helper_forwards_only_explicit_trigger_flags(monkeypatch, tmp_path):
+    script = Path(__file__).resolve().parents[1] / "scripts" / "capture-board.py"
+    spec = importlib.util.spec_from_file_location("capture_board_under_test", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    captured = []
+
+    def fake_main(argv):
+        captured.append(argv)
+        return 0
+
+    monkeypatch.setattr(module, "slt_main", fake_main)
+
+    monkeypatch.setattr(sys, "argv", ["capture-board.py", "--output-root", str(tmp_path / "unset")])
+    assert module.main() == 0
+    command = captured[0]
+    for flag in ("--edge", "--pre", "--post", "--timeout", "--port"):
+        assert flag not in command, f"unset {flag} must not override the profile"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "capture-board.py",
+            "--output-root",
+            str(tmp_path / "explicit"),
+            "--edge",
+            "falling",
+            "--pre",
+            "0.02",
+            "--post",
+            "0.3",
+            "--timeout",
+            "45",
+            "--port",
+            "12345",
+        ],
+    )
+    assert module.main() == 0
+    command = captured[1]
+    assert command[command.index("--edge") + 1] == "falling"
+    assert command[command.index("--pre") + 1] == "0.02"
+    assert command[command.index("--post") + 1] == "0.3"
+    assert command[command.index("--timeout") + 1] == "45.0"
+    assert command[command.index("--port") + 1] == "12345"
 
 
 def _uart_file(tmp_path, data, baud=115200):
