@@ -25,6 +25,9 @@
   other runtimes must register that server in their own MCP config.
   The `claude` shell wrapper on this machine fails in non-interactive
   shells (`_claude_build_argv: command not found`), so edit the JSON directly.
+- The notes above are identical in `AGENTS.md` and `CLAUDE.md`; edit both files
+  together and prove it with
+  `diff <(sed -n '1,30p' AGENTS.md) <(sed -n '1,30p' CLAUDE.md)` — empty = in sync.
 
 <!-- BEGIN LOOM ORCHESTRATION (AGENTS) -->
 This repository uses [Loom](https://github.com/rjwalters/loom) for AI-powered development orchestration (dual-runtime: Claude Code reads `CLAUDE.md`; OpenAI Codex CLI and other AGENTS.md-aware runtimes read this file). See the Loom repository for the full guide (roles, labels, worktrees, configuration). When installed, Loom also writes a locally-substituted copy of the runtime-neutral guide to `.loom/AGENTS.md`.
