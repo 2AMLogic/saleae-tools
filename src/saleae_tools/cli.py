@@ -15,8 +15,18 @@ from saleae_tools.binexport import (
     read_digital,
     read_export,
 )
+from saleae_tools.expect import Match, match_expected
 from saleae_tools.profile import Profile, Trigger, load_profile, parse_channels
 from saleae_tools.vcd import write_vcd
+
+
+def _print_match(label: str, m: Match, noun: str) -> None:
+    if m.matched:
+        print(f"{label}: matched from {noun} {m.start_offset}, {m.repeats} repeats")
+    elif m.start_offset is None:
+        print(f"{label}: pattern not found in decoded stream")
+    else:
+        print(f"{label}: first mismatch at {noun} offset {m.mismatch_offset}")
 
 
 def _describe(path: Path) -> dict[str, object]:
@@ -221,7 +231,7 @@ def cmd_timing(args: argparse.Namespace) -> int:
 
 
 def cmd_uart(args: argparse.Namespace) -> int:
-    from saleae_tools.uart import decode, match_expected
+    from saleae_tools.uart import decode
 
     try:
         expected = (
@@ -251,10 +261,11 @@ def cmd_uart(args: argparse.Namespace) -> int:
         "frames": [asdict(f) for f in frames],
     }
     ok = framing == 0 and parity == 0
+    match: Match | None = None
     if expected is not None:
         match = match_expected([f.byte for f in frames], expected)
-        report["expect"] = match
-        ok = ok and bool(match["matched"])
+        report["expect"] = asdict(match)
+        ok = ok and match.matched
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
@@ -263,21 +274,13 @@ def cmd_uart(args: argparse.Namespace) -> int:
             f"{len(frames)} frames, {framing} framing errors, {parity} parity errors, "
             f"{result.truncated} truncated"
         )
-        if expected is not None:
-            m = report["expect"]
-            assert isinstance(m, dict)
-            if m["matched"]:
-                print(f"expect: matched from byte {m['start_offset']}, {m['repeats']} repeats")
-            elif m["start_offset"] is None:
-                print("expect: pattern not found in decoded stream")
-            else:
-                print(f"expect: first mismatch at byte offset {m['mismatch_offset']}")
+        if match is not None:
+            _print_match("expect", match, "byte")
     return 0 if ok else 1
 
 
 def cmd_spi(args: argparse.Namespace) -> int:
     from saleae_tools.spi import decode
-    from saleae_tools.uart import match_expected
 
     def parse(text: str | None, flag: str) -> list[int] | None:
         if not text:
@@ -319,33 +322,28 @@ def cmd_spi(args: argparse.Namespace) -> int:
         "transactions": [asdict(t) for t in txns],
     }
     ok = result.truncated == 0 and leftover == 0
+    matches: list[tuple[str, Match]] = []
     for key, want, stream in (
         ("expect", expected, [w for t in txns for w in t.mosi]),
         ("expect_miso", expected_miso, [w for t in txns for w in (t.miso or [])]),
     ):
         if want is not None:
-            report[key] = match = match_expected(stream, want)
-            ok = ok and bool(match["matched"])
+            m = match_expected(stream, want)
+            report[key] = asdict(m)
+            matches.append((key, m))
+            ok = ok and m.matched
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
         print(f"{len(txns)} transactions, {leftover} leftover bits, {result.truncated} truncated")
-        for key in ("expect", "expect_miso"):
-            m = report.get(key)
-            if isinstance(m, dict):
-                if m["matched"]:
-                    print(f"{key}: matched from word {m['start_offset']}, {m['repeats']} repeats")
-                elif m["start_offset"] is None:
-                    print(f"{key}: pattern not found in decoded stream")
-                else:
-                    print(f"{key}: first mismatch at word offset {m['mismatch_offset']}")
+        for key, m in matches:
+            _print_match(key, m, "word")
     return 0 if ok else 1
 
 
 def cmd_syncserial(args: argparse.Namespace) -> int:
     from saleae_tools.syncserial import decode
-    from saleae_tools.uart import match_expected
 
     try:
         if args.channels:
@@ -396,23 +394,19 @@ def cmd_syncserial(args: argparse.Namespace) -> int:
         ],
     }
     ok = result.truncated == 0 and leftover == 0
+    match: Match | None = None
     if expected is not None:
         stream = [w for t in intervals for w in t.mosi]
-        report["expect"] = match = match_expected(stream, expected)
-        ok = ok and bool(match["matched"])
+        match = match_expected(stream, expected)
+        report["expect"] = asdict(match)
+        ok = ok and match.matched
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
         print(f"{len(intervals)} intervals, {leftover} leftover bits, {result.truncated} truncated")
-        m = report.get("expect")
-        if isinstance(m, dict):
-            if m["matched"]:
-                print(f"expect: matched from word {m['start_offset']}, {m['repeats']} repeats")
-            elif m["start_offset"] is None:
-                print("expect: pattern not found in decoded stream")
-            else:
-                print(f"expect: first mismatch at word offset {m['mismatch_offset']}")
+        if match is not None:
+            _print_match("expect", match, "word")
     return 0 if ok else 1
 
 
