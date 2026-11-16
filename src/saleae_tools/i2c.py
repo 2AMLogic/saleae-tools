@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from bisect import bisect_right
 from dataclasses import dataclass, field
 
 from saleae_tools.binexport import DigitalChunk, DigitalExport
@@ -24,10 +23,6 @@ class Transaction:
 class Decoded:
     transactions: list[Transaction] = field(default_factory=list)
     truncated: int = 0  # transactions cut by a chunk end; never decoded
-
-
-def _level(chunk: DigitalChunk, t: float) -> int:
-    return chunk.initial_state ^ (bisect_right(chunk.transitions, t) & 1)
 
 
 def _bits_value(bits: list[int], width: int) -> int:
@@ -99,8 +94,8 @@ def _decode_span(
         if is_clock:
             if start is None:
                 continue
-            if _level(ck, t) == 1:  # rising edge: sample SDA
-                pending = _level(cd, t)
+            if ck.level_at(t) == 1:  # rising edge: sample SDA
+                pending = cd.level_at(t)
             elif pending is not None:  # falling edge: commit the sample
                 bits.append(pending)
                 pending = None
@@ -118,11 +113,11 @@ def _decode_span(
                         txn.data.append(_bits_value(bits[-9:-1], 8))
                         txn.acks.append(bits[-1] == 0)
         else:
-            if _level(ck, t) != 1:
+            if ck.level_at(t) != 1:
                 continue  # SDA change while SCL low: ordinary data
             # SDA moved while SCL high: START (fell) or STOP (rose).
             pending = None  # the sample taken by the pre-condition clock
-            if _level(cd, t) == 0:
+            if cd.level_at(t) == 0:
                 was_repeated = start is not None
                 if was_repeated:
                     close(t)  # the open transaction ends at this repeated START
