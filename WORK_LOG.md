@@ -2,8 +2,17 @@
 
 Chronological record of merged PRs and closed issues. Maintained by the Guide role.
 
+### 2026-11-16
+
+- **PR #52**: refactor: drop i2c's _level copy of DigitalChunk.level_at
+- **PR #50**: docs: replace line-range sync check with marker-anchored diff
+- **Issue #51** (closed): Remove i2c.py's _level helper: the third copy of DigitalChunk.level_at that #32 hoisted out of uart.py and spi.py
+- **Issue #48** (closed): Make the AGENTS.md/CLAUDE.md sync proof range-free so appended drift cannot escape it
+
 ### 2026-11-15
 
+- **PR #46**: refactor: share decoder command scaffolding in cli.py
+- **Issue #45** (closed): Deduplicate the four decoder commands' scaffolding in cli.py (channel paths, --expect parsing/printing, JSON emit)
 - **PR #47**: feat(uart): report measured baud and drift, with --baud-tolerance
 - **PR #44**: feat: add slt i2c, an offline decoder for I2C transactions
 - **PR #43**: docs: make AGENTS.md and CLAUDE.md note regions byte-identical
