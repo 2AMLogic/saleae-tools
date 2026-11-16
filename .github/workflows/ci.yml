@@ -26,7 +26,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-      - run: uv sync --extra dev --extra automation
+      - run: uv sync --locked --extra dev --extra automation
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
