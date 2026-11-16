@@ -25,13 +25,13 @@ _None._
 
 Human-approved issues ready for implementation (`loom:issue`).
 
-- **#48**: Make the AGENTS.md/CLAUDE.md sync proof range-free so appended drift cannot escape it
+- **#55**: CI: pin the lockfile with 'uv sync --frozen' so dependency-bump PRs are verified against the committed lock
 
 ## In Progress
 
 Issues currently being built (`loom:building`).
 
-- **#45**: Deduplicate the four decoder commands' scaffolding in cli.py (channel paths, --expect parsing/printing, JSON emit)
+_None._
 
 ## PRs Awaiting Review
 
@@ -43,13 +43,13 @@ _None._
 
 PRs that passed review and are queued for Champion auto-merge (`loom:pr`).
 
-- **#46**: refactor: share decoder command scaffolding in cli.py
+_None._
 
 ## Proposed
 
 Issues carrying `loom:curated`.
 
-_None._
+- **#55**: CI: pin the lockfile with 'uv sync --frozen' so dependency-bump PRs are verified against the committed lock *(curated)*
 
 ## Proposed (Architect / Hermit)
 
@@ -67,10 +67,10 @@ _None._
 | Very important | 0 |
 | Important | 0 |
 | Ready (`loom:issue`) | 1 |
-| In Progress (`loom:building`) | 1 |
+| In Progress (`loom:building`) | 0 |
 | PRs awaiting review | 0 |
-| Approved PRs awaiting merge | 1 |
-| Curated | 0 |
+| Approved PRs awaiting merge | 0 |
+| Curated | 1 |
 | Architect / Hermit proposals | 0 |
 | Active epics | 0 |
 <!-- guide:plan-body:end -->

@@ -4,6 +4,7 @@ Chronological record of merged PRs and closed issues. Maintained by the Guide ro
 
 ### 2026-11-16
 
+- **PR #54**: Bump the minor-patch group with 3 updates
 - **PR #52**: refactor: drop i2c's _level copy of DigitalChunk.level_at
 - **PR #50**: docs: replace line-range sync check with marker-anchored diff
 - **Issue #51** (closed): Remove i2c.py's _level helper: the third copy of DigitalChunk.level_at that #32 hoisted out of uart.py and spi.py
