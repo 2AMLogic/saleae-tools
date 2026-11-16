@@ -13,37 +13,37 @@ _None._
 
 `loom:very-important` (one counts per workspace); every stage takes these first.
 
-- **#28**: Add an offline clocked-serial decoder and `slt` verb for the program loader (bring-up stage 2)
+_None._
 
 ## Important
 
 `loom:important`; taken before unlabelled work.
 
-- **#27**: Add an offline I2C decoder and `slt i2c --expect` over digital exports (bring-up stage 5)
+_None._
 
 ## Ready
 
 Human-approved issues ready for implementation (`loom:issue`).
 
-_None._
+- **#48**: Make the AGENTS.md/CLAUDE.md sync proof range-free so appended drift cannot escape it
 
 ## In Progress
 
 Issues currently being built (`loom:building`).
 
-_None._
+- **#45**: Deduplicate the four decoder commands' scaffolding in cli.py (channel paths, --expect parsing/printing, JSON emit)
 
 ## PRs Awaiting Review
 
 PRs waiting on Judge (`loom:review-requested`).
 
-- **#26**: docs: roadmap as of 2026-11-13
+_None._
 
 ## Approved (Awaiting Merge)
 
 PRs that passed review and are queued for Champion auto-merge (`loom:pr`).
 
-_None._
+- **#46**: refactor: share decoder command scaffolding in cli.py
 
 ## Proposed
 
@@ -64,12 +64,12 @@ _None._
 | Bucket | Count |
 |------|-------|
 | Operator merge-risk holds | 0 |
-| Very important | 1 |
-| Important | 1 |
-| Ready (`loom:issue`) | 0 |
-| In Progress (`loom:building`) | 0 |
-| PRs awaiting review | 1 |
-| Approved PRs awaiting merge | 0 |
+| Very important | 0 |
+| Important | 0 |
+| Ready (`loom:issue`) | 1 |
+| In Progress (`loom:building`) | 1 |
+| PRs awaiting review | 0 |
+| Approved PRs awaiting merge | 1 |
 | Curated | 0 |
 | Architect / Hermit proposals | 0 |
 | Active epics | 0 |
