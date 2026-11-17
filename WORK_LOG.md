@@ -2,8 +2,17 @@
 
 Chronological record of merged PRs and closed issues. Maintained by the Guide role.
 
+### 2026-11-17
+
+- **PR #61**: docs: correct CI claim in agent notes (install step uses uv sync --locked)
+- **Issue #60** (closed): CLAUDE.md/AGENTS.md say "CI runs exactly that" over a bare uv sync, but ci.yml now uses --locked
+
 ### 2026-11-16
 
+- **PR #59**: fix: require a consistent uv.lock in check:ci via uv sync --locked
+- **PR #57**: ci: pin uv sync to the committed lockfile with --locked
+- **Issue #58** (closed): check:ci no longer mirrors ci.yml after --locked was added to the CI install step
+- **Issue #55** (closed): CI: pin the lockfile with 'uv sync --frozen' so dependency-bump PRs are verified against the committed lock
 - **PR #54**: Bump the minor-patch group with 3 updates
 - **PR #52**: refactor: drop i2c's _level copy of DigitalChunk.level_at
 - **PR #50**: docs: replace line-range sync check with marker-anchored diff
