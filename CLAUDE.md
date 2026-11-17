@@ -4,7 +4,8 @@
   `saleae.automation` behind a lazy import in `saleae_tools/automation.py`.
 - `uv sync --extra dev --extra automation`, then `uv run ruff check .`,
   `uv run ruff format --check .`, `uv run mypy`, `uv run pytest -q`. CI runs
-  exactly that on macOS and Ubuntu, Python 3.12 and 3.13.
+  the same checks on macOS and Ubuntu, Python 3.12 and 3.13, with
+  `uv sync --locked` at the install step so a drifted `uv.lock` fails there.
 - Tests use synthetic exports written by `binexport.write_digital/write_analog`.
   Never commit captures; `*.bin`, `*.sal`, `*.vcd`, `*.csv` are gitignored.
   Deliberate fixtures go under `tests/fixtures/` with a `!` rule.
