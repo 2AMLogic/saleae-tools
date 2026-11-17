@@ -1,6 +1,6 @@
 {
-  "loom_version": "0.19.1305",
-  "loom_commit": "9589b4a0c59e0dff1b4e3f2b7b8e9a17f3c72e12",
+  "loom_version": "0.19.1306",
+  "loom_commit": "e7af83ea29897351d216cdfd4036ecf628cb96cc",
   "install_date": "2026-11-04",
   "installed_files": [
     ".loom/docs/observability.md",
@@ -187,8 +187,17 @@
     ".claude/commands/loom/judge.md",
     ".loom/docs/advanced-hooks.md",
     ".loom/roles/doctor.md",
-    ".loom/roles/judge.md"
+    ".loom/roles/judge.md",
+    ".loom/docs/targeted-role-invocation.md",
+    ".loom/scripts/spawn-codex.sh",
+    ".loom/scripts/sweep-lease-fence.sh",
+    ".loom/scripts/sweep-lease-publish.sh",
+    ".loom/scripts/sweep-lease-renew.sh",
+    ".loom/scripts/tests/test-sweep-lease-fence.sh",
+    ".loom/scripts/tests/test-sweep-lease-publish.sh",
+    ".loom/scripts/tests/test-sweep-lease-renew.sh",
+    ".loom/scripts/tests/test-targeted-role-invocation.sh"
   ],
   "requires_daemon": "0.19.1146",
-  "last_resync": "2026-11-16"
+  "last_resync": "2026-11-17"
 }
