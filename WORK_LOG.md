@@ -2,6 +2,11 @@
 
 Chronological record of merged PRs and closed issues. Maintained by the Guide role.
 
+### 2026-11-18
+
+- **PR #65**: ci: qualify CI workflow for GitHub merge queues
+- **Issue #64** (closed): ci: qualify PR checks for GitHub merge queues
+
 ### 2026-11-17
 
 - **PR #61**: docs: correct CI claim in agent notes (install step uses uv sync --locked)
