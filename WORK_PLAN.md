@@ -53,7 +53,7 @@ _None._
 
 ## Proposed (Architect / Hermit)
 
-- **#34**: Remove .repo/audit.md: a 47-line hygiene snapshot nothing reads, with every number stale *(hermit)* *(held)*
+- **#34**: Remove .repo/audit.md: a 47-line hygiene snapshot nothing reads, with every number stale *(hermit)*
 
 ## Epics
 
