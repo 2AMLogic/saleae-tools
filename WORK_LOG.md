@@ -2,6 +2,10 @@
 
 Chronological record of merged PRs and closed issues. Maintained by the Guide role.
 
+### 2026-11-23
+
+- **PR #70**: build(deps): Bump ruff from 0.17.3 to 0.17.4 in the minor-patch group
+
 ### 2026-11-18
 
 - **PR #65**: ci: qualify CI workflow for GitHub merge queues
