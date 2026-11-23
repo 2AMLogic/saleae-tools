@@ -8,7 +8,7 @@ The body below is a snapshot of GitHub label state as of the last merged docs-ma
 <!-- Maintained automatically by the Guide triage agent. Manual edits are fine but may be overwritten. -->
 
 <!-- guide:plan-body:start -->
-_Generated: 2026-11-18T21:29:34Z (snapshot; compare against live labels)_
+_Generated: 2026-11-23T15:54:17Z (snapshot; compare against live labels)_
 ## Operator Attention: Merge-Risk-Hold Pileup
 
 Judge-approved PRs under a hold (`loom:blocked` or `loom:operator`) — only a human merge decision is missing.
@@ -43,7 +43,7 @@ _None._
 
 PRs waiting on Judge (`loom:review-requested`).
 
-_None._
+- **#70**: build(deps): Bump ruff from 0.17.3 to 0.17.4 in the minor-patch group
 
 ## Approved (Awaiting Merge)
 
@@ -74,7 +74,7 @@ _None._
 | Important | 0 |
 | Ready (`loom:issue`, net of holds/building/merge-pending) | 0 |
 | In Progress (`loom:building`) | 0 |
-| PRs awaiting review | 0 |
+| PRs awaiting review | 1 |
 | Approved PRs awaiting merge | 0 |
 | Curated | 0 |
 | Architect / Hermit proposals | 1 |
