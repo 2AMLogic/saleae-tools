@@ -4,6 +4,7 @@ Chronological record of merged PRs and closed issues. Maintained by the Guide ro
 
 ### 2026-11-23
 
+- **Issue #71** (closed): Create the `dependencies` label on the forge so Dependabot can apply it
 - **PR #70**: build(deps): Bump ruff from 0.17.3 to 0.17.4 in the minor-patch group
 
 ### 2026-11-18
