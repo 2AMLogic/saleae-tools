@@ -8,7 +8,8 @@ The body below is a snapshot of GitHub label state as of the last merged docs-ma
 <!-- Maintained automatically by the Guide triage agent. Manual edits are fine but may be overwritten. -->
 
 <!-- guide:plan-body:start -->
-_Generated: 2026-11-25T00:02:11Z (snapshot; compare against live labels)_
+_Generated: 2026-11-27T11:48:54Z (snapshot; compare against live labels)_
+
 ## Operator Attention: Merge-Risk-Hold Pileup
 
 Judge-approved PRs under a hold (`loom:blocked` or `loom:operator`) — only a human merge decision is missing.
@@ -29,7 +30,7 @@ _None._
 
 ## Ready
 
-Human-approved issues (`loom:issue`) ready for implementation — excluding held (`loom:blocked`/`loom:operator`/`loom:frozen`), `loom:building`, and issues closed by an open `loom:pr` PR (listed under Approved).
+Human-approved issues (`loom:issue`) ready for implementation. This list excludes issues on hold (`loom:blocked`, `loom:operator`, or `loom:frozen`), issues in progress (`loom:building`), and issues that an open PR under Approved (`loom:pr`) will close.
 
 _None._
 
@@ -59,7 +60,7 @@ _None._
 
 ## Proposed (Architect / Hermit)
 
-- **#34**: Remove .repo/audit.md: a 47-line hygiene snapshot nothing reads, with every number stale *(hermit)* *(held)*
+- **#34**: Remove .repo/audit.md: a 47-line hygiene snapshot nothing reads, with every number stale *(hermit)*
 
 ## Epics
 
