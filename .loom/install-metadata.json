@@ -1,6 +1,6 @@
 {
-  "loom_version": "0.19.1306",
-  "loom_commit": "e7af83ea29897351d216cdfd4036ecf628cb96cc",
+  "loom_version": "0.20.51",
+  "loom_commit": "27d6bcd37598d723164781a8924901bfbea30331",
   "install_date": "2026-11-04",
   "installed_files": [
     ".loom/docs/observability.md",
@@ -198,6 +198,7 @@
     ".loom/scripts/tests/test-sweep-lease-renew.sh",
     ".loom/scripts/tests/test-targeted-role-invocation.sh"
   ],
-  "requires_daemon": "0.19.1146",
-  "last_resync": "2026-11-17"
+  "requires_daemon": "0.20.34",
+  "last_resync": "2026-11-28",
+  "loom_source_remote": "https://github.com/2AMLogic/loom.git"
 }
